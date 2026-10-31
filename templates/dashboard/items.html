@@ -1,0 +1,537 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Items{% endblock %}
+{% set active = 'items' %}
+
+{% block content %}
+<div x-data="itemsApp()" x-init="init()">
+
+  <div class="page-header">
+    <div class="page-heading">
+      <h1 class="page-title">Items</h1>
+      <p class="page-subtitle">Konten yang bisa ditambahkan ke playlist.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" @click="openCreate()">
+        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Buat Item
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" class="loading-state">Memuat…</div>
+
+  <!-- Empty state -->
+  <div x-show="!loading && items.length === 0" class="empty-state">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+    </svg>
+    <p>Belum ada item.</p>
+    <button type="button" class="btn btn-primary" @click="openCreate()">Buat Item</button>
+  </div>
+
+  <!-- Item list -->
+  <div x-show="!loading && items.length > 0" class="list">
+    <template x-for="item in items" :key="item.id">
+      <div class="list-row wrap">
+
+        <!-- Thumbnail -->
+        <div class="thumb">
+          <img x-show="item.type === 'media' && item.media?.type === 'image'"
+               :src="item.media?.url" :alt="item.name" loading="lazy">
+          <svg x-show="item.type === 'media' && item.media?.type === 'video'"
+               style="width:20px; height:20px; color:#f87171;"
+               fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <svg x-show="item.type === 'html'"
+               style="width:18px; height:18px; color:#60a5fa;"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+          </svg>
+        </div>
+
+        <!-- Info -->
+        <div class="row-main">
+          <p class="row-title" :title="item.name" x-text="item.name"></p>
+          <div class="row-badges">
+            <span :class="item.type === 'media' ? 'badge badge-media' : 'badge badge-html'"
+                  x-text="item.type === 'media' ? 'Media' : 'HTML'"></span>
+            <span x-show="item.type === 'media' && item.media"
+                  :class="item.media?.type === 'image' ? 'badge badge-image' : 'badge badge-video'"
+                  x-text="item.media?.type === 'image' ? 'Gambar' : 'Video'"></span>
+            <span x-show="item.type === 'html' && item.template"
+                  style="font-size:0.7rem; color:var(--faint);" x-text="item.template?.filename"></span>
+            <span x-show="item.type === 'html' && item.generated_file"
+                  class="status-dot ok">generated</span>
+            <span x-show="item.type === 'html' && !item.generated_file"
+                  class="status-dot warn">belum generate</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="row-actions">
+          <a x-show="item.type === 'html' && item.generated_url"
+             :href="item.generated_url" target="_blank" rel="noopener"
+             class="btn btn-ghost btn-sm">Preview</a>
+          <button type="button" @click="openEdit(item)" class="btn btn-ghost btn-sm">Edit</button>
+          <button type="button" @click="confirmDelete(item)" class="btn btn-danger-ghost btn-sm">Hapus</button>
+        </div>
+
+      </div>
+    </template>
+  </div>
+
+  <!-- ── MODAL CREATE / EDIT ─────────────────────────────────────────── -->
+  <div x-show="showModal" x-cloak class="modal-backdrop top">
+    <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="item-modal-title">
+
+      <p class="modal-title" id="item-modal-title"
+         x-text="editTarget ? 'Edit Item' : 'Buat Item Baru'"></p>
+
+      <!-- Nama -->
+      <div class="form-stack">
+        <div>
+          <label class="label" for="item-name">Nama Item</label>
+          <input id="item-name" class="input" x-model="form.name" type="text"
+                 placeholder="Misal: Promo Akhir Tahun">
+        </div>
+
+        <!-- Tipe (hanya saat create) -->
+        <div x-show="!editTarget">
+          <span class="label">Tipe</span>
+          <div class="choice-group">
+            <button type="button" class="choice"
+                    :class="form.type === 'media' ? 'is-active' : ''"
+                    @click="form.type = 'media'">
+              🖼️ Media
+            </button>
+            <button type="button" class="choice"
+                    :class="form.type === 'html' ? 'is-active' : ''"
+                    @click="form.type = 'html'; loadTemplates()">
+              🧩 HTML Template
+            </button>
+          </div>
+        </div>
+
+        <!-- ── TIPE MEDIA ── -->
+        <div x-show="form.type === 'media'">
+          <span class="label">Pilih dari Media Library</span>
+          <div x-show="mediaList.length === 0" class="hint" style="padding:8px 0;">
+            Belum ada media. <a href="/dashboard/media" class="text-link">Upload dulu</a>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:8px;">
+            <template x-for="m in mediaList" :key="m.id">
+              <div class="select-card"
+                   :class="form.media_id === m.id ? 'is-active' : ''"
+                   @click="form.media_id = m.id"
+                   role="button"
+                   tabindex="0"
+                   @keydown.enter="form.media_id = m.id"
+                   :aria-pressed="(form.media_id === m.id).toString()">
+                <div style="aspect-ratio:16/9; background:#0a0e18; display:flex;
+                            align-items:center; justify-content:center; overflow:hidden;">
+                  <img x-show="m.type === 'image'" :src="m.url" :alt="m.name"
+                       style="width:100%; height:100%; object-fit:cover;">
+                  <svg x-show="m.type === 'video'" style="width:16px; height:16px; color:#f87171;"
+                       fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </div>
+                <p style="font-size:0.6rem; color:var(--muted); padding:4px 5px; margin:0;
+                          white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                   x-text="m.name"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ── TIPE HTML ── -->
+        <div x-show="form.type === 'html'">
+
+          <!-- Pilih template -->
+          <div style="margin-bottom:14px;">
+            <span class="label">Template</span>
+            <div x-show="templateList.length === 0" class="hint" style="padding:4px 0;">
+              Belum ada template. <a href="/dashboard/templates" class="text-link">Upload dulu</a>
+            </div>
+            <div class="list" style="gap:6px;">
+              <template x-for="t in templateList" :key="t.id">
+                <div class="select-card"
+                     :class="form.template_id === t.id ? 'is-active' : ''"
+                     @click="selectTemplate(t)"
+                     role="button"
+                     tabindex="0"
+                     @keydown.enter="selectTemplate(t)"
+                     :aria-pressed="(form.template_id === t.id).toString()">
+                  <div class="select-card-body">
+                    <svg style="width:13px; height:13px; color:#60a5fa; flex-shrink:0;"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                    </svg>
+                    <span style="font-size:0.825rem; font-weight:500; color:var(--text);"
+                          x-text="t.name"></span>
+                    <span class="badge badge-html" x-text="t.filename"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Form fields (auto-generated dari template) -->
+          <div x-show="form.template_id && fieldDefs.length > 0">
+            <div style="height:1px; background:var(--border); margin-bottom:16px;"></div>
+            <p class="section-title" style="margin-bottom:12px;">Isi konten template</p>
+
+            <div class="form-stack">
+              <template x-for="f in fieldDefs" :key="f.name">
+                <div>
+                  <span class="label" x-text="f.label"></span>
+
+                  <!-- text -->
+                  <input x-show="f.type === 'text'" type="text" class="input"
+                         :placeholder="f.default"
+                         :value="form.field_data[f.name] ?? f.default"
+                         @input="form.field_data[f.name] = $event.target.value">
+
+                  <!-- textarea -->
+                  <textarea x-show="f.type === 'textarea'" rows="3" class="input"
+                            :placeholder="f.default"
+                            @input="form.field_data[f.name] = $event.target.value"
+                            x-text="form.field_data[f.name] ?? f.default"></textarea>
+
+                  <!-- number -->
+                  <input x-show="f.type === 'number'" type="number" class="input"
+                         :placeholder="f.default"
+                         :value="form.field_data[f.name] ?? f.default"
+                         @input="form.field_data[f.name] = $event.target.value">
+
+                  <!-- color -->
+                  <div x-show="f.type === 'color'" style="display:flex; align-items:center; gap:8px;">
+                    <input type="color"
+                           :value="form.field_data[f.name] || f.default || '#ffffff'"
+                           @input="form.field_data[f.name] = $event.target.value"
+                           style="width:40px; height:36px; border-radius:5px; border:1px solid var(--border);
+                                  background:var(--surface-2); cursor:pointer; padding:2px;">
+                    <span style="font-size:0.8rem; color:var(--muted);"
+                          x-text="form.field_data[f.name] || f.default || '#ffffff'"></span>
+                  </div>
+
+                  <!-- image: library + upload -->
+                  <div x-show="f.type === 'image'"
+                       x-data="{ imgTab: 'library', uploading: false }"
+                       x-init="imgTab = 'library'">
+
+                    <!-- Selected preview -->
+                    <div x-show="form.field_data[f.name]"
+                         style="display:flex; align-items:center; gap:8px; margin-bottom:8px;
+                                padding:6px 10px; background:var(--surface-2); border-radius:6px;
+                                border:1px solid var(--border);">
+                      <img :src="form.field_data[f.name]" alt=""
+                           style="width:40px; height:28px; object-fit:cover; border-radius:3px; flex-shrink:0;">
+                      <span style="font-size:0.75rem; color:var(--success); flex:1; min-width:0;
+                                   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        ✓ <span x-text="getMediaName(form.field_data[f.name])"></span>
+                      </span>
+                      <button type="button" @click="form.field_data[f.name] = ''"
+                              class="icon-btn" style="width:24px; height:24px;" aria-label="Hapus gambar">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div x-show="!form.field_data[f.name]" class="hint" style="margin-bottom:8px;">
+                      Belum dipilih
+                    </div>
+
+                    <!-- Tab bar -->
+                    <div class="tabs" style="margin-bottom:10px;">
+                      <button type="button" class="tab" :class="imgTab === 'library' ? 'active' : ''"
+                              @click="imgTab = 'library'">Library</button>
+                      <button type="button" class="tab" :class="imgTab === 'upload' ? 'active' : ''"
+                              @click="imgTab = 'upload'">Upload Baru</button>
+                    </div>
+
+                    <!-- Tab: Library -->
+                    <div x-show="imgTab === 'library'">
+                      <div x-show="imageMedia.length === 0" class="hint" style="padding:8px 0;">
+                        Belum ada gambar di library.
+                      </div>
+                      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr));
+                                  gap:6px; max-height:180px; overflow-y:auto;">
+                        <template x-for="m in imageMedia" :key="m.id">
+                          <div class="select-card"
+                               :class="form.field_data[f.name] === '/static/' + m.path ? 'is-active' : ''"
+                               @click="form.field_data[f.name] = '/static/' + m.path"
+                               role="button" tabindex="0"
+                               @keydown.enter="form.field_data[f.name] = '/static/' + m.path"
+                               :aria-pressed="(form.field_data[f.name] === '/static/' + m.path).toString()">
+                            <div style="aspect-ratio:16/9; overflow:hidden;">
+                              <img :src="m.url" :alt="m.name"
+                                   style="width:100%; height:100%; object-fit:cover;" loading="lazy">
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+
+                    <!-- Tab: Upload Baru -->
+                    <div x-show="imgTab === 'upload'">
+                      <div class="upload-zone" style="padding:20px;"
+                           @click="$refs['imgUpload_' + f.name].click()"
+                           @dragover.prevent
+                           @drop.prevent="handleImageDrop($event, f.name)"
+                           :style="uploading ? 'opacity:0.6; pointer-events:none;' : ''">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                             style="width:24px; height:24px;">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        <p style="font-size:0.775rem;">
+                          <span x-show="!uploading">Klik atau drag gambar ke sini</span>
+                          <span x-show="uploading" style="color:var(--accent-soft);">Mengupload…</span>
+                        </p>
+                        <p class="hint">PNG, JPG, GIF, WEBP</p>
+                        <input :x-ref="'imgUpload_' + f.name"
+                               x-ref="imgUploadRef"
+                               type="file" accept="image/*" style="display:none"
+                               @change="handleImageUpload($event, f.name)">
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" @click="closeModal()">Batal</button>
+        <button type="button" class="btn btn-primary" @click="saveItem()" :disabled="saving">
+          <span x-show="!saving" x-text="editTarget ? 'Simpan' : 'Buat & Generate'"></span>
+          <span x-show="saving">Menyimpan…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal hapus -->
+  <div x-show="deleteTarget" x-cloak class="modal-backdrop">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="delete-item-title">
+      <p class="modal-title" id="delete-item-title">Hapus item?</p>
+      <p class="modal-text">
+        "<strong x-text="deleteTarget?.name"></strong>" akan dihapus beserta file generated-nya.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" @click="deleteTarget = null">Batal</button>
+        <button type="button" class="btn btn-danger" @click="doDelete()">Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-cloak
+       :class="toast.error ? 'toast is-error' : 'toast is-success'"
+       class="toast"
+       role="status"
+       x-text="toast.message"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function itemsApp() {
+  return {
+    items: [], loading: true,
+    showModal: false, saving: false,
+    editTarget: null, deleteTarget: null,
+    mediaList: [], templateList: [], fieldDefs: [],
+    toast: { show: false, message: '', error: false },
+
+    form: { name: '', type: 'media', media_id: null, template_id: null, field_data: {} },
+
+    get imageMedia() {
+      return this.mediaList.filter(m => m.type === 'image');
+    },
+
+    async init() { await this.fetchItems(); },
+
+    async fetchItems() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/items');
+        this.items = await res.json();
+      } finally { this.loading = false; }
+    },
+
+    async loadMedia() {
+      const res = await fetch('/api/media');
+      this.mediaList = await res.json();
+    },
+
+    async loadTemplates() {
+      const res = await fetch('/api/templates');
+      this.templateList = await res.json();
+    },
+
+    async selectTemplate(t) {
+      this.form.template_id = t.id;
+      this.form.field_data = {};
+      const res = await fetch(`/api/templates/${t.id}/fields`);
+      const data = await res.json();
+      this.fieldDefs = data.fields || [];
+      // Set default values
+      this.fieldDefs.forEach(f => {
+        if (f.default) this.form.field_data[f.name] = f.default;
+      });
+    },
+
+    getMediaName(url) {
+      if (!url) return '';
+      const parts = url.split('/');
+      return parts[parts.length - 1];
+    },
+
+    async handleImageUpload(event, fieldName) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      await this._uploadImageFile(file, fieldName);
+    },
+
+    async handleImageDrop(event, fieldName) {
+      const file = event.dataTransfer.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      await this._uploadImageFile(file, fieldName);
+    },
+
+    async _uploadImageFile(file, fieldName) {
+      const fd = new FormData();
+      fd.append('files', file);
+      try {
+        const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.uploaded?.length) {
+          this.showToast('Gagal upload gambar', true);
+          return;
+        }
+        const uploaded = data.uploaded[0];
+        // Tambah ke mediaList supaya muncul di library tab juga
+        this.mediaList.unshift({ ...uploaded, _hover: false });
+        // Langsung set sebagai nilai field
+        this.form.field_data[fieldName] = '/static/' + uploaded.path;
+        this.showToast('Gambar berhasil diupload');
+      } catch {
+        this.showToast('Gagal upload gambar', true);
+      }
+    },
+
+    openCreate() {
+      this.editTarget = null;
+      this.form = { name: '', type: 'media', media_id: null, template_id: null, field_data: {} };
+      this.fieldDefs = [];
+      this.loadMedia();
+      this.loadTemplates();
+      this.showModal = true;
+    },
+
+    openEdit(item) {
+      this.editTarget = item;
+      this.form = {
+        name: item.name,
+        type: item.type,
+        media_id: item.media_id,
+        template_id: item.template_id,
+        field_data: { ...(item.field_data || {}) },
+      };
+      this.fieldDefs = [];
+      this.loadMedia();
+      if (item.type === 'html') {
+        this.loadTemplates().then(() => {
+          if (item.template_id) {
+            fetch(`/api/templates/${item.template_id}/fields`)
+              .then(r => r.json())
+              .then(d => { this.fieldDefs = d.fields || []; });
+          }
+        });
+      }
+      this.showModal = true;
+    },
+
+    closeModal() {
+      this.showModal = false;
+      this.editTarget = null;
+      this.fieldDefs = [];
+    },
+
+    async saveItem() {
+      if (!this.form.name.trim()) { this.showToast('Nama wajib diisi', true); return; }
+      this.saving = true;
+      const payload = {
+        name: this.form.name,
+        type: this.form.type,
+        media_id: this.form.media_id,
+        template_id: this.form.template_id,
+        field_data: this.form.field_data,
+      };
+      try {
+        let res, data;
+        if (this.editTarget) {
+          res = await fetch(`/api/items/${this.editTarget.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } else {
+          res = await fetch('/api/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        }
+        data = await res.json();
+        if (!res.ok) { this.showToast(data.error || 'Gagal simpan', true); return; }
+
+        if (this.editTarget) {
+          const idx = this.items.findIndex(i => i.id === this.editTarget.id);
+          if (idx !== -1) this.items[idx] = data;
+        } else {
+          this.items.unshift(data);
+        }
+        this.closeModal();
+        this.showToast(this.editTarget ? 'Item diperbarui' : 'Item berhasil dibuat');
+      } catch { this.showToast('Gagal simpan', true); }
+      finally { this.saving = false; }
+    },
+
+    confirmDelete(item) { this.deleteTarget = item; },
+
+    async doDelete() {
+      const item = this.deleteTarget;
+      this.deleteTarget = null;
+      const res = await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        this.showToast(d.error || 'Gagal hapus', true);
+        return;
+      }
+      this.items = this.items.filter(i => i.id !== item.id);
+      this.showToast('Item dihapus');
+    },
+
+    showToast(message, error = false) {
+      this.toast = { show: true, message, error };
+      setTimeout(() => this.toast.show = false, 3500);
+    },
+  };
+}
+</script>
+{% endblock %}

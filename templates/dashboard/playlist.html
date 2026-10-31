@@ -1,0 +1,419 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Playlist{% endblock %}
+{% set active = 'playlist' %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div x-data="playlistApp({{ channel_id }})" x-init="init()">
+
+  <div class="page-header">
+    <div style="display:flex; align-items:flex-start; gap:8px; min-width:0; flex:1 1 320px;">
+      <a href="/dashboard/channels" class="icon-btn" aria-label="Kembali ke Channels"
+         style="margin-top:2px;">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <div class="page-heading" style="min-width:0;">
+        <h1 class="page-title"
+            style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+            x-text="channel ? 'Playlist — ' + channel.name : 'Memuat…'"></h1>
+        <a x-show="channel" :href="channel?.display_url" target="_blank" rel="noopener"
+           class="text-link" style="display:inline-block; margin-top:4px;"
+           x-text="channel ? location.origin + channel.display_url : ''"></a>
+      </div>
+    </div>
+    <div class="page-actions">
+      <button type="button" @click="showAddItem = true" class="btn btn-primary">
+        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Tambah Item
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" class="loading-state">Memuat playlist…</div>
+
+  <!-- Empty state -->
+  <div x-show="!loading && playlist.length === 0" class="empty-state">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+    </svg>
+    <p>Playlist kosong. Tambahkan item untuk mulai.</p>
+    <button type="button" class="btn btn-primary" @click="showAddItem = true">Tambah Item</button>
+  </div>
+
+  <!-- Playlist -->
+  <div x-show="!loading && playlist.length > 0">
+
+    <!-- Info durasi total -->
+    <div class="section-header" style="margin-bottom:10px;">
+      <p class="row-sub" style="margin:0;">
+        <span x-text="playlist.length"></span> item · Total loop:
+        <span x-text="totalDuration"></span>
+      </p>
+      <p class="hint" style="margin:0;">Drag untuk mengubah urutan</p>
+    </div>
+
+    <!-- Sortable list -->
+    <div id="playlist-sortable" class="list" style="gap:8px;">
+      <template x-for="(pi, index) in playlist" :key="pi.playlist_item_id">
+        <div :data-id="pi.playlist_item_id" class="playlist-row">
+
+          <!-- Drag handle -->
+          <div class="drag-handle">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 8h16M4 16h16"/>
+            </svg>
+          </div>
+
+          <!-- Order number -->
+          <span class="playlist-order" x-text="index + 1"></span>
+
+          <!-- Thumbnail -->
+          <div class="thumb sm">
+            <img x-show="pi.type === 'media' && pi.media_type === 'image'"
+                 :src="pi.src" :alt="pi.name" loading="lazy">
+            <svg x-show="pi.type === 'media' && pi.media_type === 'video'"
+                 style="width:16px; height:16px; color:#f87171;"
+                 fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg x-show="pi.type === 'html'"
+                 style="width:14px; height:14px; color:#60a5fa;"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+            </svg>
+          </div>
+
+          <!-- Info -->
+          <div class="playlist-info">
+            <p class="row-title" style="font-size:0.825rem;" x-text="pi.name"></p>
+            <div class="row-badges">
+              <span :class="pi.type === 'media' ? 'badge badge-media' : 'badge badge-html'"
+                    x-text="pi.type === 'media' ? 'Media' : 'HTML'"></span>
+              <span x-show="pi.type === 'media' && pi.media_type"
+                    :class="pi.media_type === 'image' ? 'badge badge-image' : 'badge badge-video'"
+                    x-text="pi.media_type === 'image' ? 'Gambar' : 'Video'"></span>
+            </div>
+          </div>
+
+          <!-- Durasi & aksi -->
+          <div class="playlist-controls">
+            <template x-if="pi.type === 'media' && pi.media_type === 'video'">
+              <span class="chip">Auto</span>
+            </template>
+
+            <template x-if="!(pi.type === 'media' && pi.media_type === 'video')">
+              <div class="duration-group">
+                <input type="number" min="1" max="300" class="input input-sm"
+                       :value="pi.duration"
+                       :aria-label="'Durasi ' + pi.name"
+                       @change="updateDuration(pi, $event.target.value)">
+                <span>dtk</span>
+              </div>
+            </template>
+
+            <!-- Preview -->
+            <a x-show="pi.type === 'html' && pi.src"
+               :href="pi.src" target="_blank" rel="noopener"
+               class="btn btn-ghost btn-sm">Preview</a>
+
+            <!-- Hapus -->
+            <button type="button" @click="removeItem(pi)"
+                    class="icon-btn danger"
+                    :aria-label="'Hapus ' + pi.name + ' dari playlist'"
+                    title="Hapus dari playlist">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Save order button -->
+    <div x-show="dirty" x-cloak class="save-bar-wrap">
+      <div class="save-bar">
+        <p>Ada perubahan yang belum disimpan</p>
+        <button type="button" @click="saveOrder()" class="btn btn-primary" :disabled="saving">
+          <span x-show="!saving">💾 Simpan Urutan</span>
+          <span x-show="saving">Menyimpan…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL TAMBAH ITEM ─────────────────────────────────────────── -->
+  <div x-show="showAddItem" x-cloak class="modal-backdrop top">
+    <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="add-item-title">
+      <p class="modal-title" id="add-item-title">Tambah Item ke Playlist</p>
+
+      <!-- Search -->
+      <div style="margin-bottom:12px;">
+        <input x-model="search" type="text" class="input" placeholder="Cari item…" aria-label="Cari item">
+      </div>
+
+      <!-- Filter tab -->
+      <div class="tabs" style="margin-bottom:12px;">
+        <template x-for="tab in ['Semua','Media','HTML']" :key="tab">
+          <button type="button" class="tab"
+                  :class="filterTab === tab ? 'active' : ''"
+                  @click="filterTab = tab"
+                  x-text="tab"></button>
+        </template>
+      </div>
+
+      <!-- Item list -->
+      <div class="picker-list">
+        <div x-show="filteredItems.length === 0" class="hint"
+             style="padding:20px 0; text-align:center;">
+          Tidak ada item.
+        </div>
+
+        <template x-for="item in filteredItems" :key="item.id">
+          <div class="pick-row"
+               :class="selectedIds.has(item.id) ? 'is-selected' : ''"
+               @click="toggleSelect(item)"
+               role="button" tabindex="0"
+               @keydown.enter="toggleSelect(item)"
+               :aria-pressed="selectedIds.has(item.id) ? 'true' : 'false'">
+
+            <!-- Check -->
+            <div class="check-box" :class="selectedIds.has(item.id) ? 'is-checked' : ''">
+              <svg x-show="selectedIds.has(item.id)" style="width:10px; height:10px;"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+
+            <!-- Thumbnail -->
+            <div class="thumb xs">
+              <img x-show="item.type === 'media' && item.media?.type === 'image'"
+                   :src="item.media?.url" :alt="item.name" loading="lazy">
+              <svg x-show="item.type === 'media' && item.media?.type === 'video'"
+                   style="width:14px; height:14px; color:#f87171;"
+                   fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              <svg x-show="item.type === 'html'" style="width:12px; height:12px; color:#60a5fa;"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+              </svg>
+            </div>
+
+            <!-- Info -->
+            <div class="pick-row-info">
+              <p class="pick-row-name" x-text="item.name"></p>
+              <span :class="item.type === 'media' ? 'badge badge-media' : 'badge badge-html'"
+                    x-text="item.type === 'media' ? 'Media' : 'HTML'"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  gap:10px; flex-wrap:wrap; margin-top:16px;">
+        <p class="hint" style="margin:0;"
+           x-text="selectedIds.size ? selectedIds.size + ' item dipilih' : ''"></p>
+        <div class="row-actions" style="margin-left:auto;">
+          <button type="button" class="btn btn-ghost" @click="closeAddModal()">Batal</button>
+          <button type="button" class="btn btn-primary" @click="addSelected()"
+                  :disabled="selectedIds.size === 0 || adding">
+            <span x-show="!adding">Tambah ke Playlist</span>
+            <span x-show="adding">Menambahkan…</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-cloak
+       :class="toast.error ? 'toast is-error' : 'toast is-success'"
+       class="toast"
+       role="status"
+       x-text="toast.message"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function playlistApp(channelId) {
+  return {
+    channelId,
+    channel: null,
+    playlist: [],
+    allItems: [],
+    loading: true,
+    saving: false,
+    adding: false,
+    dirty: false,
+    showAddItem: false,
+    search: '',
+    filterTab: 'Semua',
+    selectedIds: new Set(),
+    toast: { show: false, message: '', error: false },
+    _sortable: null,
+
+    get totalDuration() {
+      let secs = 0, hasAuto = false;
+      this.playlist.forEach(pi => {
+        if (pi.duration == null) { hasAuto = true; }
+        else { secs += Number(pi.duration); }
+      });
+      const m = Math.floor(secs / 60), s = secs % 60;
+      let str = m > 0 ? `${m}m ${s}s` : `${s}s`;
+      return hasAuto ? str + ' + video' : str;
+    },
+
+    get filteredItems() {
+      let items = this.allItems;
+      if (this.filterTab === 'Media') items = items.filter(i => i.type === 'media');
+      if (this.filterTab === 'HTML')  items = items.filter(i => i.type === 'html');
+      if (this.search.trim()) {
+        const q = this.search.toLowerCase();
+        items = items.filter(i => i.name.toLowerCase().includes(q));
+      }
+      return items;
+    },
+
+    async init() {
+      await Promise.all([this.fetchPlaylist(), this.fetchAllItems()]);
+      this.$nextTick(() => this.initSortable());
+    },
+
+    async fetchPlaylist() {
+      this.loading = true;
+      try {
+        const res = await fetch(`/api/channels/${this.channelId}/playlist`);
+        const data = await res.json();
+        this.channel  = data.channel;
+        this.playlist = data.items;
+      } finally { this.loading = false; }
+    },
+
+    async fetchAllItems() {
+      const res = await fetch('/api/items');
+      this.allItems = await res.json();
+    },
+
+    initSortable() {
+      const el = document.getElementById('playlist-sortable');
+      if (!el) return;
+      this._sortable = Sortable.create(el, {
+        handle: '.drag-handle',
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        onEnd: () => {
+          // Sync urutan dari DOM ke data
+          const ids = [...el.querySelectorAll('[data-id]')]
+            .map(n => parseInt(n.dataset.id));
+          this.playlist = ids.map(id =>
+            this.playlist.find(p => p.playlist_item_id === id)
+          ).filter(Boolean);
+          this.dirty = true;
+        },
+      });
+    },
+
+    updateDuration(pi, val) {
+      pi.duration = Math.max(1, parseInt(val) || 1);
+      this.dirty = true;
+    },
+
+    async saveOrder() {
+      this.saving = true;
+      const entries = this.playlist.map((pi, idx) => ({
+        playlist_item_id: pi.playlist_item_id,
+        order: idx,
+        duration: pi.duration,
+      }));
+      try {
+        const res = await fetch(`/api/channels/${this.channelId}/playlist`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entries),
+        });
+        if (!res.ok) { this.showToast('Gagal menyimpan', true); return; }
+        this.dirty = false;
+        this.showToast('Urutan playlist disimpan');
+      } catch { this.showToast('Gagal menyimpan', true); }
+      finally { this.saving = false; }
+    },
+
+    toggleSelect(item) {
+      const s = new Set(this.selectedIds);
+      if (s.has(item.id)) s.delete(item.id);
+      else s.add(item.id);
+      this.selectedIds = s;
+    },
+
+    async addSelected() {
+      if (!this.selectedIds.size || this.adding) return;
+      this.adding = true;
+      let added = 0;
+      for (const itemId of this.selectedIds) {
+        try {
+          const res = await fetch(`/api/channels/${this.channelId}/playlist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_id: itemId, duration: 10 }),
+          });
+          if (res.ok) {
+            const pi = await res.json();
+            this.playlist.push(pi);
+            added++;
+          }
+        } catch {}
+      }
+      this.adding = false;
+      this.closeAddModal();
+      if (added) {
+        this.showToast(`${added} item ditambahkan ke playlist`);
+        await this.$nextTick();
+        this.initSortable();
+      }
+    },
+
+    async removeItem(pi) {
+      const res = await fetch(
+        `/api/channels/${this.channelId}/playlist/${pi.playlist_item_id}`,
+        { method: 'DELETE' }
+      );
+      if (!res.ok) { this.showToast('Gagal menghapus', true); return; }
+      this.playlist = this.playlist.filter(p => p.playlist_item_id !== pi.playlist_item_id);
+      this.dirty = false;
+      this.showToast('Item dihapus dari playlist');
+    },
+
+    closeAddModal() {
+      this.showAddItem = false;
+      this.selectedIds = new Set();
+      this.search = '';
+      this.filterTab = 'Semua';
+    },
+
+    showToast(message, error = false) {
+      this.toast = { show: true, message, error };
+      setTimeout(() => this.toast.show = false, 3000);
+    },
+  };
+}
+</script>
+<style>
+.sortable-ghost { opacity: 0.3; background: #1e2535; }
+</style>
+{% endblock %}

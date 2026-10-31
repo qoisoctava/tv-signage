@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ channel.name }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #display-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .display-slot {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    .display-slot.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .display-slot img {
+      max-width: 100vw;
+      max-height: 100vh;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .display-slot video {
+      max-width: 100vw;
+      max-height: 100vh;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .display-slot iframe {
+      width: 100vw;
+      height: 100vh;
+      border: none;
+      background: #000;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.875rem;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading">Memuat playlist…</div>
+  <div id="display-container"></div>
+
+  <script>
+    const CHANNEL_SLUG = "{{ channel.slug }}";
+    const API_URL = `/api/channels/by-slug/${CHANNEL_SLUG}/playlist`;
+    const POLL_INTERVAL = 10000; // 10 detik
+
+    let playlist = [];
+    let currentIndex = 0;
+    let timer = null;
+
+    async function loadPlaylist() {
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+        return data.items || [];
+      } catch (e) {
+        console.error('Gagal load playlist:', e);
+        return [];
+      }
+    }
+
+    function buildSlots(items) {
+      const container = document.getElementById('display-container');
+      container.innerHTML = '';
+
+      items.forEach((item, idx) => {
+        const slot = document.createElement('div');
+        slot.className = 'display-slot';
+        slot.dataset.index = idx;
+
+        if (item.type === 'media') {
+          if (item.media_type === 'image') {
+            const img = document.createElement('img');
+            img.src = item.src;
+            img.alt = item.name;
+            slot.appendChild(img);
+          } else if (item.media_type === 'video') {
+            const video = document.createElement('video');
+            video.src = item.src;
+            video.muted = true;
+            video.playsInline = true;
+            video.preload = 'auto';
+            slot.appendChild(video);
+          }
+        } else if (item.type === 'html') {
+          const iframe = document.createElement('iframe');
+          iframe.src = item.src;
+          iframe.scrolling = 'no';
+          slot.appendChild(iframe);
+        }
+
+        container.appendChild(slot);
+      });
+    }
+
+    function showSlot(index) {
+      const slots = document.querySelectorAll('.display-slot');
+      slots.forEach(s => s.classList.remove('active'));
+
+      if (slots.length === 0) return;
+      const slot = slots[index];
+      if (!slot) return;
+
+      slot.classList.add('active');
+      const item = playlist[index];
+
+      // Pause semua video lain
+      document.querySelectorAll('.display-slot video').forEach(v => {
+        v.pause();
+        v.currentTime = 0;
+      });
+
+      if (item.type === 'media' && item.media_type === 'video') {
+        const video = slot.querySelector('video');
+        if (video) {
+          video.play();
+          video.onended = () => nextSlot();
+          return; // jangan set timer, tunggu video selesai
+        }
+      }
+
+      const duration = (item.duration || 10) * 1000;
+      timer = setTimeout(() => nextSlot(), duration);
+    }
+
+    function nextSlot() {
+      if (timer) clearTimeout(timer);
+      currentIndex = (currentIndex + 1) % playlist.length;
+      showSlot(currentIndex);
+    }
+
+    async function init() {
+      playlist = await loadPlaylist();
+      document.getElementById('loading').style.display = 'none';
+
+      if (playlist.length === 0) {
+        document.getElementById('loading').style.display = 'flex';
+        document.getElementById('loading').textContent = 'Playlist kosong.';
+        return;
+      }
+
+      buildSlots(playlist);
+      currentIndex = 0;
+      showSlot(currentIndex);
+    }
+
+    // Polling untuk live update
+    async function pollUpdates() {
+      const newPlaylist = await loadPlaylist();
+      // Cek apakah ada perubahan (simple: bandingkan JSON)
+      if (JSON.stringify(newPlaylist) !== JSON.stringify(playlist)) {
+        const prevIndex = currentIndex;
+        playlist = newPlaylist;
+        if (timer) clearTimeout(timer);
+        buildSlots(playlist);
+        currentIndex = Math.min(prevIndex, playlist.length - 1);
+        showSlot(currentIndex);
+      }
+    }
+
+    init();
+    setInterval(pollUpdates, POLL_INTERVAL);
+  </script>
+</body>
+</html>

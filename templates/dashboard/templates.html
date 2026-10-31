@@ -1,0 +1,235 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Templates{% endblock %}
+{% set active = 'templates' %}
+
+{% block content %}
+<div x-data="templatesApp()" x-init="init()">
+
+  <div class="page-header">
+    <div class="page-heading">
+      <h1 class="page-title">Templates</h1>
+      <p class="page-subtitle">Template HTML kustom untuk iklan dinamis.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" @click="showUpload = true">
+        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        Upload Template
+      </button>
+    </div>
+  </div>
+
+  <!-- Panduan format field -->
+  <div class="card card-pad" style="border-color:#1e3a5f; margin-bottom:20px;">
+    <p class="section-title" style="color:var(--accent-soft); margin-bottom:8px;">
+      Format field dalam template HTML
+    </p>
+    <code class="code-block">
+      &#123;&#123;nama_field:tipe:Label:default&#125;&#125;<br>
+      <span style="color:var(--dim);">— tipe: </span>
+      <span style="color:var(--success);">text</span> &nbsp;
+      <span style="color:var(--success);">textarea</span> &nbsp;
+      <span style="color:var(--success);">image</span> &nbsp;
+      <span style="color:var(--success);">color</span> &nbsp;
+      <span style="color:var(--success);">number</span>
+    </code>
+    <p class="hint" style="margin:6px 0 0;">
+      Contoh:
+      <code style="color:var(--muted);">
+        &#123;&#123;judul:text:Judul Iklan:Produk Terbaru&#125;&#125;
+      </code>
+    </p>
+  </div>
+
+  <!-- Upload modal -->
+  <div x-show="showUpload" x-cloak class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="upload-template-title">
+      <p class="modal-title" id="upload-template-title">Upload Template HTML</p>
+
+      <div class="form-stack">
+        <div>
+          <label class="label" for="template-name">Nama Template</label>
+          <input id="template-name" class="input" x-model="form.name" type="text"
+                 placeholder="Misal: Promo Produk">
+        </div>
+
+        <div>
+          <label class="label" for="template-description">Deskripsi (opsional)</label>
+          <input id="template-description" class="input" x-model="form.description" type="text"
+                 placeholder="Deskripsi singkat">
+        </div>
+
+        <div>
+          <span class="label">File HTML</span>
+          <div class="upload-zone" style="padding:18px;"
+               @click="$refs.tmplFile.click()">
+            <span x-show="!form.file" class="hint">Klik untuk pilih file .html</span>
+            <span x-show="form.file" style="color:var(--success); font-size:0.8rem;"
+                  x-text="form.file?.name"></span>
+            <input x-ref="tmplFile" type="file" accept=".html" style="display:none"
+                   @change="form.file = $event.target.files[0]; if(!form.name) form.name = $event.target.files[0].name.replace('.html','').replace(/_/g,' ')">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" @click="showUpload = false; resetForm()">Batal</button>
+        <button type="button" class="btn btn-primary" @click="uploadTemplate()" :disabled="!form.file || uploading">
+          <span x-show="!uploading">Upload</span>
+          <span x-show="uploading">Mengupload…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" class="loading-state">Memuat…</div>
+
+  <!-- Empty state -->
+  <div x-show="!loading && templates.length === 0" class="empty-state">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+    </svg>
+    <p>Belum ada template. Upload file HTML pertama Anda.</p>
+  </div>
+
+  <!-- Template list -->
+  <div x-show="!loading && templates.length > 0" class="list">
+    <template x-for="t in templates" :key="t.id">
+      <div class="card card-pad">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div class="row-main">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+              <svg style="width:14px; height:14px; color:#60a5fa; flex-shrink:0;"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+              </svg>
+              <p class="row-title" x-text="t.name"></p>
+              <span class="badge badge-html" x-text="t.filename"></span>
+            </div>
+
+            <p x-show="t.description" class="row-sub" x-text="t.description"></p>
+
+            <!-- Fields preview -->
+            <div x-show="t._fields" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
+              <template x-for="f in (t._fields || [])" :key="f.name">
+                <span class="chip">
+                  <span x-text="f.label"></span>
+                  <span class="type" x-text="'· ' + f.type"></span>
+                </span>
+              </template>
+            </div>
+
+            <button type="button" x-show="!t._fields" @click="loadFields(t)"
+                    class="text-link" style="background:none; border:none; cursor:pointer; padding:0; margin-top:6px;">
+              Lihat fields →
+            </button>
+          </div>
+
+          <div class="row-actions">
+            <span style="font-size:0.7rem; color:var(--dim);" x-text="t.item_count + ' item'"></span>
+            <button type="button" @click="confirmDelete(t)" class="btn btn-danger-ghost btn-sm">Hapus</button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Modal hapus -->
+  <div x-show="deleteTarget" x-cloak class="modal-backdrop">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="delete-template-title">
+      <p class="modal-title" id="delete-template-title">Hapus template?</p>
+      <p class="modal-text">
+        "<strong x-text="deleteTarget?.name"></strong>" dan file-nya akan dihapus permanen.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" @click="deleteTarget = null">Batal</button>
+        <button type="button" class="btn btn-danger" @click="doDelete()">Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-cloak
+       :class="toast.error ? 'toast is-error' : 'toast is-success'"
+       class="toast"
+       role="status"
+       x-text="toast.message"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function templatesApp() {
+  return {
+    templates: [], loading: true,
+    showUpload: false, uploading: false,
+    deleteTarget: null,
+    toast: { show: false, message: '', error: false },
+    form: { name: '', description: '', file: null },
+
+    async init() { await this.fetch(); },
+
+    async fetch() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/templates');
+        this.templates = await res.json();
+      } finally { this.loading = false; }
+    },
+
+    async loadFields(t) {
+      const res = await fetch(`/api/templates/${t.id}/fields`);
+      const data = await res.json();
+      t._fields = data.fields || [];
+    },
+
+    async uploadTemplate() {
+      if (!this.form.file || this.uploading) return;
+      this.uploading = true;
+      const fd = new FormData();
+      fd.append('file', this.form.file);
+      fd.append('name', this.form.name);
+      fd.append('description', this.form.description);
+      try {
+        const res = await fetch('/api/templates/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) { this.showToast(data.error || 'Gagal upload', true); return; }
+        this.templates.unshift({ ...data, item_count: 0 });
+        this.showUpload = false;
+        this.resetForm();
+        this.showToast('Template berhasil diupload');
+      } catch { this.showToast('Gagal upload', true); }
+      finally { this.uploading = false; }
+    },
+
+    confirmDelete(t) { this.deleteTarget = t; },
+
+    async doDelete() {
+      const t = this.deleteTarget;
+      this.deleteTarget = null;
+      const res = await fetch(`/api/templates/${t.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        this.showToast(d.error || 'Gagal hapus', true);
+        return;
+      }
+      this.templates = this.templates.filter(x => x.id !== t.id);
+      this.showToast('Template dihapus');
+    },
+
+    resetForm() { this.form = { name: '', description: '', file: null }; },
+
+    showToast(message, error = false) {
+      this.toast = { show: true, message, error };
+      setTimeout(() => this.toast.show = false, 3000);
+    },
+  };
+}
+</script>
+{% endblock %}

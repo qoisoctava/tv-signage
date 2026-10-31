@@ -1,0 +1,292 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Media{% endblock %}
+{% set active = 'media' %}
+
+{% block content %}
+<div x-data="mediaApp()" x-init="init()">
+
+  <div class="page-header">
+    <div class="page-heading">
+      <h1 class="page-title">Media Library</h1>
+      <p class="page-subtitle">
+        <span x-text="counts.total">0</span> file
+        · <span x-text="counts.image">0</span> gambar
+        · <span x-text="counts.video">0</span> video
+      </p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" @click="openUpload()">
+        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        Upload
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter tab -->
+  <div class="tabs">
+    <template x-for="tab in tabs" :key="tab.value">
+      <button type="button"
+              class="tab"
+              :class="activeTab === tab.value ? 'active' : ''"
+              @click="activeTab = tab.value; filterMedia()"
+              x-text="tab.label"></button>
+    </template>
+  </div>
+
+  <!-- Upload zone -->
+  <div x-show="showUpload" x-cloak class="card card-pad" style="margin-bottom:20px;">
+    <div class="upload-zone"
+         :class="dragOver ? 'is-dragover' : ''"
+         @dragover.prevent="dragOver = true"
+         @dragleave.prevent="dragOver = false"
+         @drop.prevent="onDrop($event)"
+         @click="$refs.fileInput.click()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      </svg>
+      <p>Drag &amp; drop file di sini, atau <span class="accent">klik untuk pilih</span></p>
+      <p class="hint">PNG, JPG, GIF, WEBP, MP4, WEBM, MOV — maks. 200 MB per file</p>
+      <input x-ref="fileInput" type="file" multiple accept="image/*,video/*"
+             style="display:none" @change="onFileSelect($event)">
+    </div>
+
+    <!-- Queue -->
+    <div x-show="queue.length > 0" class="list" style="margin-top:16px;">
+      <template x-for="(f, i) in queue" :key="i">
+        <div class="list-row" style="padding:8px 10px; background:var(--surface-2);">
+          <div style="width:32px; height:32px; border-radius:5px; background:var(--surface-3);
+                      display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg x-show="f.isImage" style="width:16px; height:16px; color:#a78bfa;"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <svg x-show="!f.isImage" style="width:16px; height:16px; color:#f87171;"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <div class="row-main">
+            <p class="row-title" style="font-size:0.8rem;" x-text="f.name"></p>
+            <p class="row-sub" x-text="f.sizeLabel"></p>
+          </div>
+          <div x-show="f.status === 'uploading'" style="width:80px;">
+            <div style="height:3px; background:var(--surface-3); border-radius:2px;">
+              <div style="height:3px; border-radius:2px; background:var(--accent); width:60%;"></div>
+            </div>
+          </div>
+          <span x-show="f.status === 'done'" style="font-size:0.75rem; color:var(--success);">✓</span>
+          <span x-show="f.status === 'error'" style="font-size:0.75rem; color:#f87171;">✗</span>
+          <button type="button" x-show="f.status === 'waiting'" @click="queue.splice(i, 1)"
+                  class="icon-btn danger" aria-label="Hapus dari antrean">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </template>
+
+      <div class="row-actions" style="margin-left:0; justify-content:flex-start; margin-top:4px;">
+        <button type="button" class="btn btn-primary" @click="uploadAll()" :disabled="uploading">
+          <span x-show="!uploading">Upload Semua</span>
+          <span x-show="uploading">Mengupload…</span>
+        </button>
+        <button type="button" class="btn btn-ghost" @click="queue = []" :disabled="uploading">Batal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div x-show="loading" class="loading-state">Memuat…</div>
+
+  <!-- Empty state -->
+  <div x-show="!loading && filtered.length === 0" class="empty-state">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+    <p>Belum ada media. Upload file pertama Anda.</p>
+    <button type="button" class="btn btn-primary" @click="openUpload()">Upload Sekarang</button>
+  </div>
+
+  <!-- Media grid -->
+  <div x-show="!loading && filtered.length > 0" class="media-grid">
+    <template x-for="m in filtered" :key="m.id">
+      <div class="card media-card">
+        <div class="media-thumb">
+          <img x-show="m.type === 'image'" :src="m.url" :alt="m.name" loading="lazy">
+          <svg x-show="m.type === 'video'" style="width:28px; height:28px; color:#f87171; opacity:0.6;"
+               fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </div>
+
+        <div class="media-info">
+          <p class="row-title" style="font-size:0.75rem;" :title="m.name" x-text="m.name"></p>
+          <div class="media-meta">
+            <span :class="m.type === 'image' ? 'badge badge-image' : 'badge badge-video'"
+                  x-text="m.type === 'image' ? 'Gambar' : 'Video'"></span>
+            <span class="size" x-text="m.size_label"></span>
+            <button type="button" class="icon-btn danger"
+                    @click.stop="confirmDelete(m)"
+                    :aria-label="'Hapus ' + m.name"
+                    title="Hapus media">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Modal konfirmasi hapus -->
+  <div x-show="deleteTarget" x-cloak class="modal-backdrop">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="delete-media-title">
+      <p class="modal-title" id="delete-media-title">Hapus media?</p>
+      <p class="modal-text">
+        "<strong x-text="deleteTarget?.name"></strong>" akan dihapus permanen dari disk.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" @click="deleteTarget = null">Batal</button>
+        <button type="button" class="btn btn-danger" @click="doDelete()">Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-cloak
+       :class="toast.error ? 'toast is-error' : 'toast is-success'"
+       class="toast"
+       role="status"
+       x-text="toast.message"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function mediaApp() {
+  return {
+    media: [], filtered: [], loading: true,
+    activeTab: 'all', showUpload: false, dragOver: false,
+    queue: [], uploading: false, deleteTarget: null,
+    toast: { show: false, message: '', error: false },
+
+    tabs: [
+      { value: 'all',   label: 'Semua' },
+      { value: 'image', label: 'Gambar' },
+      { value: 'video', label: 'Video' },
+    ],
+
+    get counts() {
+      return {
+        total: this.media.length,
+        image: this.media.filter(m => m.type === 'image').length,
+        video: this.media.filter(m => m.type === 'video').length,
+      };
+    },
+
+    async init() { await this.fetchMedia(); },
+
+    async fetchMedia() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/media');
+        this.media = (await res.json()).map(m => ({ ...m, _hover: false }));
+        this.filterMedia();
+      } finally { this.loading = false; }
+    },
+
+    filterMedia() {
+      this.filtered = this.activeTab === 'all'
+        ? this.media
+        : this.media.filter(m => m.type === this.activeTab);
+    },
+
+    openUpload() { this.showUpload = !this.showUpload; },
+
+    onFileSelect(e) { this.addFiles([...e.target.files]); e.target.value = ''; },
+    onDrop(e) { this.dragOver = false; this.addFiles([...e.dataTransfer.files]); },
+
+    addFiles(files) {
+      const allowed = ['image/png','image/jpeg','image/gif','image/webp',
+                       'video/mp4','video/webm','video/quicktime'];
+      files.forEach(f => {
+        if (!allowed.includes(f.type)) return;
+        this.queue.push({
+          file: f, name: f.name,
+          isImage: f.type.startsWith('image/'),
+          sizeLabel: this.formatSize(f.size),
+          status: 'waiting', progress: 0,
+        });
+      });
+      this.showUpload = true;
+    },
+
+    async uploadAll() {
+      if (this.uploading) return;
+      this.uploading = true;
+      const waiting = this.queue.filter(f => f.status === 'waiting');
+      const formData = new FormData();
+      waiting.forEach(f => { formData.append('files', f.file); f.status = 'uploading'; });
+
+      try {
+        const res = await fetch('/api/media/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        waiting.forEach(f => f.status = 'done');
+        if (data.uploaded?.length) {
+          this.media = [...data.uploaded.map(m => ({ ...m, _hover: false })), ...this.media];
+          this.filterMedia();
+          this.showToast(`${data.uploaded.length} file berhasil diupload`);
+        }
+        if (data.errors?.length) this.showToast(`${data.errors.length} file gagal`, true);
+        setTimeout(() => {
+          this.queue = this.queue.filter(f => f.status !== 'done');
+          if (!this.queue.length) this.showUpload = false;
+        }, 1500);
+      } catch {
+        waiting.forEach(f => f.status = 'error');
+        this.showToast('Upload gagal', true);
+      } finally { this.uploading = false; }
+    },
+
+    confirmDelete(m) { this.deleteTarget = m; },
+
+    async doDelete() {
+      const m = this.deleteTarget;
+      this.deleteTarget = null;
+      try {
+        const res = await fetch(`/api/media/${m.id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const data = await res.json();
+          this.showToast(data.error || 'Gagal menghapus', true);
+          return;
+        }
+        this.media = this.media.filter(x => x.id !== m.id);
+        this.filterMedia();
+        this.showToast('Media dihapus');
+      } catch { this.showToast('Gagal menghapus', true); }
+    },
+
+    showToast(message, error = false) {
+      this.toast = { show: true, message, error };
+      setTimeout(() => this.toast.show = false, 3000);
+    },
+
+    formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    },
+  };
+}
+</script>
+{% endblock %}

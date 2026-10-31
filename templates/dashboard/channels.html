@@ -1,0 +1,226 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Channels{% endblock %}
+{% set active = 'channels' %}
+
+{% block content %}
+<div x-data="channelsApp()" x-init="init()">
+
+  <div class="page-header">
+    <div class="page-heading">
+      <h1 class="page-title">Channels</h1>
+      <p class="page-subtitle">Setiap channel punya URL display dan playlist sendiri.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-primary" @click="showCreate = true">
+        <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Buat Channel
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" class="loading-state">Memuat…</div>
+
+  <!-- Empty state -->
+  <div x-show="!loading && channels.length === 0" class="empty-state">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+    </svg>
+    <p>Belum ada channel.</p>
+    <button type="button" class="btn btn-primary" @click="showCreate = true">Buat Channel</button>
+  </div>
+
+  <!-- Channel list -->
+  <div x-show="!loading && channels.length > 0" class="list">
+    <template x-for="ch in channels" :key="ch.id">
+      <div class="card card-pad">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div class="row-main">
+
+            <!-- Nama & jumlah item -->
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+              <svg style="width:15px; height:15px; color:#60a5fa; flex-shrink:0;"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              <p class="row-title lg" x-text="ch.name"></p>
+              <span class="badge badge-media" x-text="ch.item_count + ' item'"></span>
+            </div>
+
+            <!-- Display URL -->
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+              <code class="code-inline" x-text="getDisplayUrl(ch)"></code>
+              <button type="button" @click="copyUrl(ch)"
+                      style="font-size:0.72rem; color:var(--accent-soft); background:none;
+                             border:none; cursor:pointer; padding:0;">
+                <span x-show="!ch._copied">Salin</span>
+                <span x-show="ch._copied" style="color:var(--success);">✓ Disalin</span>
+              </button>
+            </div>
+
+            <!-- Aksi -->
+            <div class="row-actions" style="margin-left:0;">
+              <a :href="'/dashboard/channels/' + ch.id + '/playlist'" class="btn btn-primary btn-sm">
+                <svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                Kelola Playlist
+              </a>
+              <a :href="ch.display_url" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
+                <svg style="width:12px; height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+                Buka Display
+              </a>
+              <button type="button" @click="confirmDelete(ch)" class="btn btn-danger-ghost btn-sm">
+                Hapus
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Modal buat channel -->
+  <div x-show="showCreate" x-cloak class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-channel-title">
+      <p class="modal-title" id="create-channel-title">Buat Channel Baru</p>
+
+      <div class="form-stack">
+        <div>
+          <label class="label" for="channel-name">Nama Channel</label>
+          <input id="channel-name" class="input" x-model="form.name" @input="autoSlug()"
+                 type="text" placeholder="Misal: Lobby Utama">
+        </div>
+
+        <div>
+          <label class="label" for="channel-slug">
+            Slug <span class="hint">(URL display)</span>
+          </label>
+          <div class="input-group">
+            <span class="input-addon">/display-</span>
+            <input id="channel-slug" class="input" x-model="form.slug" type="text" placeholder="lobby-utama">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" @click="showCreate = false; resetForm()">Batal</button>
+        <button type="button" class="btn btn-primary" @click="createChannel()" :disabled="saving">
+          <span x-show="!saving">Buat</span>
+          <span x-show="saving">Menyimpan…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal hapus -->
+  <div x-show="deleteTarget" x-cloak class="modal-backdrop">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="delete-channel-title">
+      <p class="modal-title" id="delete-channel-title">Hapus channel?</p>
+      <p class="modal-text">
+        "<strong x-text="deleteTarget?.name"></strong>" dan seluruh playlist-nya akan dihapus.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" @click="deleteTarget = null">Batal</button>
+        <button type="button" class="btn btn-danger" @click="doDelete()">Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-cloak
+       :class="toast.error ? 'toast is-error' : 'toast is-success'"
+       class="toast"
+       role="status"
+       x-text="toast.message"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function channelsApp() {
+  return {
+    channels: [], loading: true,
+    showCreate: false, saving: false,
+    deleteTarget: null,
+    toast: { show: false, message: '', error: false },
+    form: { name: '', slug: '' },
+
+    async init() { await this.fetchChannels(); },
+
+    async fetchChannels() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/channels');
+        this.channels = (await res.json()).map(c => ({ ...c, _copied: false }));
+      } finally { this.loading = false; }
+    },
+
+    getDisplayUrl(ch) {
+      return `${location.origin}/display-${ch.slug}`;
+    },
+
+    async copyUrl(ch) {
+      await navigator.clipboard.writeText(this.getDisplayUrl(ch));
+      ch._copied = true;
+      setTimeout(() => ch._copied = false, 2000);
+    },
+
+    autoSlug() {
+      this.form.slug = this.form.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-');
+    },
+
+    async createChannel() {
+      if (!this.form.name.trim()) { this.showToast('Nama wajib diisi', true); return; }
+      this.saving = true;
+      try {
+        const res = await fetch('/api/channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: this.form.name, slug: this.form.slug }),
+        });
+        const data = await res.json();
+        if (!res.ok) { this.showToast(data.error || 'Gagal membuat channel', true); return; }
+        this.channels.push({ ...data, _copied: false });
+        this.showCreate = false;
+        this.resetForm();
+        this.showToast('Channel berhasil dibuat');
+      } catch { this.showToast('Gagal membuat channel', true); }
+      finally { this.saving = false; }
+    },
+
+    confirmDelete(ch) { this.deleteTarget = ch; },
+
+    async doDelete() {
+      const ch = this.deleteTarget;
+      this.deleteTarget = null;
+      const res = await fetch(`/api/channels/${ch.id}`, { method: 'DELETE' });
+      if (!res.ok) { this.showToast('Gagal menghapus', true); return; }
+      this.channels = this.channels.filter(c => c.id !== ch.id);
+      this.showToast('Channel dihapus');
+    },
+
+    resetForm() { this.form = { name: '', slug: '' }; },
+
+    showToast(message, error = false) {
+      this.toast = { show: true, message, error };
+      setTimeout(() => this.toast.show = false, 3000);
+    },
+  };
+}
+</script>
+{% endblock %}
