@@ -138,7 +138,7 @@
 
     .breadcrumb a:hover { color: var(--muted); }
     .breadcrumb .current { color: var(--muted); }
-    .breadcrumb .sep { color: var(--surface-3); }
+    .breadcrumb .sep { color: #334155; }
 
     .menu-btn { display: none; }
 
@@ -1064,7 +1064,6 @@
 
     @media (max-width: 640px) {
       .topbar { padding: 0 14px; }
-      .breadcrumb { display: none; }
       .main { padding: 18px 14px 32px; }
 
       .page-header { margin-bottom: 20px; }
@@ -1077,8 +1076,9 @@
       .stat-value { font-size: 1.5rem; }
 
       .list-row { padding: 12px; }
-      .row-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
-      .row-actions .btn { flex: 1 1 auto; }
+      .row-actions { margin-left: auto; }
+      .list-row .row-actions { width: 100%; margin-left: 0; justify-content: stretch; }
+      .list-row .row-actions .btn { flex: 1 1 auto; }
 
       .media-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 
@@ -1095,7 +1095,7 @@
 
     @media (max-width: 560px) {
       .playlist-row { flex-wrap: wrap; }
-      .playlist-info { flex: 1 1 calc(100% - 120px); }
+      .playlist-info { flex: 1 1 150px; }
 
       .playlist-controls {
         width: 100%;

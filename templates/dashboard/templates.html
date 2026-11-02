@@ -100,14 +100,15 @@
   <div x-show="!loading && templates.length > 0" class="list">
     <template x-for="t in templates" :key="t.id">
       <div class="card card-pad">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <svg style="width:14px; height:14px; color:#60a5fa; flex-shrink:0; margin-top:3px;"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+          </svg>
+
           <div class="row-main">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
-              <svg style="width:14px; height:14px; color:#60a5fa; flex-shrink:0;"
-                   fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-              </svg>
               <p class="row-title" x-text="t.name"></p>
               <span class="badge badge-html" x-text="t.filename"></span>
             </div>
@@ -129,11 +130,13 @@
               Lihat fields →
             </button>
           </div>
+        </div>
 
-          <div class="row-actions">
-            <span style="font-size:0.7rem; color:var(--dim);" x-text="t.item_count + ' item'"></span>
-            <button type="button" @click="confirmDelete(t)" class="btn btn-danger-ghost btn-sm">Hapus</button>
-          </div>
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    gap:10px; margin-top:10px; padding-top:10px;
+                    border-top:1px solid var(--border);">
+          <span class="hint" x-text="t.item_count + ' item'"></span>
+          <button type="button" @click="confirmDelete(t)" class="btn btn-danger-ghost btn-sm">Hapus</button>
         </div>
       </div>
     </template>

@@ -147,7 +147,12 @@
       <div class="save-bar">
         <p>Ada perubahan yang belum disimpan</p>
         <button type="button" @click="saveOrder()" class="btn btn-primary" :disabled="saving">
-          <span x-show="!saving">💾 Simpan Urutan</span>
+          <span x-show="!saving" style="display:inline-flex; align-items:center; gap:6px;">
+            <svg style="width:13px; height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Simpan Urutan
+          </span>
           <span x-show="saving">Menyimpan…</span>
         </button>
       </div>

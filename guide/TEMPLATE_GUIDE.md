@@ -13,16 +13,19 @@ Template HTML adalah cara membuat tampilan iklan kustom yang bisa diisi kontenny
 5. [Penggunaan Field di CSS](#penggunaan-field-di-css)
 6. [Penggunaan Field di HTML](#penggunaan-field-di-html)
 7. [Field Berulang](#field-berulang)
-8. [Struktur HTML yang Disarankan](#struktur-html-yang-disarankan)
-9. [Contoh Template Lengkap](#contoh-template-lengkap)
-10. [Tips & Best Practices](#tips--best-practices)
-11. [Troubleshooting](#troubleshooting)
+8. [Animasi](#animasi)
+9. [Struktur HTML yang Disarankan](#struktur-html-yang-disarankan)
+10. [Contoh Template Lengkap](#contoh-template-lengkap)
+11. [Tips & Best Practices](#tips--best-practices)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Konsep Dasar
 
-Template HTML adalah file `.html` biasa yang di dalamnya terdapat **placeholder field** dengan format khusus. Saat admin membuat item dari template, sistem akan:
+Template HTML adalah **satu file `.html` tunggal** yang di dalamnya terdapat **placeholder field** dengan format khusus. CSS dan JavaScript ditulis langsung di dalam file yang sama — tidak ada file eksternal.
+
+Saat admin membuat item dari template, sistem akan:
 
 1. Membaca file template dan menemukan semua field
 2. Menampilkan form otomatis di dashboard berdasarkan field yang ditemukan
@@ -36,8 +39,17 @@ Template HTML (dengan placeholder)
     Admin isi form
           │
           ▼
-  File HTML generated (siap tampil)
+  File HTML generated (siap tampil di layar)
 ```
+
+### Penting: Template adalah konten pasif
+
+Template dirancang untuk **ditonton, bukan diinteraksikan**. Tidak ada pengguna yang mengklik, mengetik, atau berinteraksi dengan layar display. Oleh karena itu:
+
+- **Tidak perlu tombol (button)** — tidak ada aksi yang bisa diklik
+- **Tidak perlu form input** — isian sudah ditentukan saat membuat item di dashboard
+- **Tidak perlu hover effect** — layar hanya dilihat dari jarak jauh
+- **Fokus pada visual** — animasi, tipografi besar, dan warna yang menarik perhatian
 
 ---
 
@@ -70,34 +82,30 @@ Template HTML (dengan placeholder)
 
 ### `text` — Input teks satu baris
 
-Cocok untuk judul, nama, label pendek, URL, atau nilai CSS non-warna.
+Cocok untuk judul, nama, label pendek, atau nilai CSS non-warna.
 
 ```html
 <h1>{{judul:text:Judul Iklan:Produk Terbaru}}</h1>
 <span class="label">{{kategori:text:Kategori:Unggulan}}</span>
 ```
 
-Form yang muncul: `<input type="text">`
-
 ---
 
 ### `textarea` — Input teks multi-baris
 
-Cocok untuk deskripsi, body teks, atau konten yang panjang.
+Cocok untuk deskripsi, body teks, atau konten panjang.
 
 ```html
 <p>{{deskripsi:textarea:Deskripsi Produk:Masukkan deskripsi di sini.}}</p>
 ```
 
-Form yang muncul: `<textarea rows="3">`
-
-> **Catatan:** Jika teks mengandung baris baru (`\n`), gunakan `white-space: pre-line` di CSS agar baris baru ditampilkan dengan benar di browser.
+> **Catatan:** Tambahkan `white-space: pre-line` di CSS agar baris baru dari textarea ditampilkan dengan benar di browser.
 
 ---
 
 ### `image` — Pilih atau upload gambar
 
-Cocok untuk foto produk, banner, logo, atau ilustrasi. Nilai yang disimpan adalah URL lengkap gambar (misal `/static/uploads/abc123.jpg`).
+Nilai yang disimpan adalah URL gambar (misal `/static/uploads/abc123.jpg`).
 
 ```html
 <img src="{{foto_produk:image:Foto Produk}}" alt="produk">
@@ -105,13 +113,13 @@ Cocok untuk foto produk, banner, logo, atau ilustrasi. Nilai yang disimpan adala
 
 Form yang muncul: grid gambar dari media library + tab upload baru.
 
-> **Penting:** Selalu beri atribut `alt` yang bermakna. Jika gambar belum dipilih, `src` akan kosong dan gambar tidak tampil — desain template dengan mempertimbangkan kondisi ini.
+> **Catatan:** Jika field gambar belum dipilih, atribut `src` kosong dan gambar tidak tampil. Rancang template dengan mempertimbangkan kondisi ini.
 
 ---
 
 ### `color` — Color picker
 
-Cocok untuk warna background, teks, border, atau aksen. Nilai yang disimpan dalam format hex (`#rrggbb`).
+Nilai disimpan dalam format hex (`#rrggbb`). Paling berguna dipakai di CSS.
 
 ```html
 <style>
@@ -120,24 +128,16 @@ Cocok untuk warna background, teks, border, atau aksen. Nilai yang disimpan dala
 </style>
 ```
 
-Form yang muncul: `<input type="color">` dengan preview hex.
-
-> **Catatan:** Field `color` paling berguna ditempatkan di CSS, bukan di atribut HTML.
-
 ---
 
 ### `number` — Input angka
 
-Cocok untuk harga, jumlah, persentase diskon, atau nilai numerik lain.
+Cocok untuk harga, persentase diskon, atau nilai numerik lain.
 
 ```html
 <div class="harga">Rp {{harga:number:Harga:0}}</div>
 <div class="diskon">Diskon {{diskon:number:Persen Diskon:0}}%</div>
 ```
-
-Form yang muncul: `<input type="number">`
-
-> **Catatan:** Nilai disimpan sebagai string — format tampilan (titik ribuan, desimal) ditangani di CSS/JS template jika diperlukan.
 
 ---
 
@@ -148,85 +148,184 @@ Form yang muncul: `<input type="number">`
 - **Case-sensitive**: `judul` dan `Judul` dianggap field berbeda
 - Jika nama field sama muncul lebih dari satu kali, **hanya definisi pertama** yang dijadikan field — kemunculan berikutnya tetap diganti dengan nilai yang sama
 
-**Nama yang valid:**
-```
-judul, nama_produk, bg_color, harga2, cta_text
-```
-
-**Nama yang tidak valid:**
-```
-2judul, nama-produk, nama produk, judul!
-```
+**Valid:** `judul`, `nama_produk`, `bg_color`, `harga2`  
+**Tidak valid:** `2judul`, `nama-produk`, `nama produk`, `judul!`
 
 ---
 
 ## Penggunaan Field di CSS
 
-Field bisa dipakai langsung sebagai nilai properti CSS — ini cara yang paling efektif untuk field tipe `color`.
-
 ```html
 <style>
-  body {
-    background-color: {{bg_color:color:Warna Background:#0f172a}};
-    color: {{text_color:color:Warna Teks:#ffffff}};
+  :root {
+    --aksen: {{aksen:color:Warna Aksen:#3b82f6}};
+    --bg:    {{bg:color:Background:#0f172a}};
   }
-
-  .tombol {
-    background: {{aksen:color:Warna Aksen:#3b82f6}};
-    border-radius: {{radius:text:Border Radius:8px}};
-  }
+  body      { background: var(--bg); }
+  .sorot    { color: var(--aksen); }
+  .badge    { background: var(--aksen); }
 </style>
 ```
 
-> **Perhatian:** Pastikan nilai default yang diberikan adalah nilai CSS yang valid. Untuk field `color`, selalu beri default berupa hex code lengkap (`#rrggbb`).
+Mendefinisikan field warna sebagai CSS variable di `:root` adalah cara terbersih — field cukup dideklarasikan satu kali, lalu dipakai berulang via `var(--nama)` tanpa perlu menduplikasi sintaks `{{...}}`.
 
 ---
 
 ## Penggunaan Field di HTML
 
-Field bisa dipakai di mana saja dalam HTML: sebagai konten elemen, nilai atribut, atau bagian dari teks.
+Field bisa dipakai di mana saja: konten elemen, nilai atribut, atau bagian dari teks.
 
 ```html
-<!-- Sebagai konten elemen -->
+<!-- Konten elemen -->
 <h1>{{judul:text:Judul}}</h1>
 <p>{{deskripsi:textarea:Deskripsi}}</p>
 
-<!-- Sebagai nilai atribut -->
-<img src="{{gambar:image:Gambar}}" alt="{{judul:text:Judul}}">
-<a href="{{link_url:text:URL Tombol:#}}">{{cta:text:Teks Tombol:Klik di sini}}</a>
+<!-- Nilai atribut -->
+<img src="{{gambar:image:Gambar}}" alt="{{judul}}">
 
-<!-- Sebagai bagian teks -->
+<!-- Bagian dari teks -->
 <div class="harga">Rp {{harga:number:Harga:0}},-</div>
-<div class="label">{{persen:number:Diskon:0}}% OFF</div>
+<div class="badge">{{persen:number:Diskon:0}}% OFF</div>
 ```
 
 ---
 
 ## Field Berulang
 
-Jika nama field yang sama muncul **lebih dari satu kali** dalam template, semua kemunculannya akan diganti dengan **nilai yang sama**. Ini berguna untuk nilai seperti warna aksen yang dipakai di beberapa tempat.
+Nama field yang muncul lebih dari satu kali akan diganti dengan **nilai yang sama**. Definisi (tipe/label/default) cukup ditulis pada kemunculan pertama.
 
 ```html
 <style>
-  /* warna_aksen didefinisikan di sini (kemunculan PERTAMA) */
-  .tombol { background: {{warna_aksen:color:Warna Aksen:#e63946}}; }
+  /* definisi PERTAMA — tipe, label, dan default ditulis di sini */
+  .badge { background: {{aksen:color:Warna Aksen:#e63946}}; }
 </style>
-
 <body>
-  <!-- kemunculan berikutnya: tidak perlu definisi ulang,
-       cukup nama field saja — tipe/label/default boleh diisi atau dikosongkan -->
-  <h2 style="color: {{warna_aksen}}">{{judul:text:Judul:Judul Iklan}}</h2>
-  <span class="badge" style="border-color: {{warna_aksen}}">NEW</span>
+  <!-- kemunculan berikutnya — cukup nama field -->
+  <h2 style="color: {{aksen}}">{{judul:text:Judul:Judul Iklan}}</h2>
+  <div style="border-color: {{aksen}}">NEW</div>
 </body>
 ```
 
-Form hanya akan menampilkan **satu input** untuk `warna_aksen`, dan nilainya berlaku untuk semua kemunculan di template.
+Form hanya menampilkan **satu input** untuk `aksen`, berlaku untuk semua kemunculan.
+
+---
+
+## Animasi
+
+Karena tidak ada interaksi pengguna, **animasi CSS looping** adalah cara utama membuat tampilan terasa hidup dan menarik perhatian. Gunakan `@keyframes` dengan `animation-iteration-count: infinite`.
+
+### Animasi yang disarankan
+
+**Fade in konten saat tampil:**
+
+```css
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.judul    { animation: fadeUp 0.8s ease both; }
+.subjudul { animation: fadeUp 0.8s 0.15s ease both; }
+.harga    { animation: fadeUp 0.8s 0.3s ease both; }
+```
+
+**Pulse — efek denyut pada elemen penting:**
+
+```css
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.04); }
+}
+.badge { animation: pulse 2s ease-in-out infinite; }
+```
+
+**Float — melayang naik turun:**
+
+```css
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-12px); }
+}
+.gambar-produk { animation: float 3s ease-in-out infinite; }
+```
+
+**Shimmer — kilap pada teks atau border:**
+
+```css
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+.judul {
+  background: linear-gradient(90deg, #fff 25%, #f59e0b 50%, #fff 75%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+```
+
+**Marquee — teks berjalan (cocok untuk pengumuman):**
+
+```css
+@keyframes marquee {
+  from { transform: translateX(100vw); }
+  to   { transform: translateX(-100%); }
+}
+.teks-berjalan {
+  white-space: nowrap;
+  animation: marquee 12s linear infinite;
+}
+```
+
+**Rotate — elemen berputar pelan:**
+
+```css
+@keyframes rotate-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.dekorasi { animation: rotate-slow 20s linear infinite; }
+```
+
+### Stagger — animasi berurutan
+
+Untuk membuat elemen muncul bergantian, gunakan `animation-delay` yang meningkat:
+
+```css
+.item:nth-child(1) { animation-delay: 0s;    }
+.item:nth-child(2) { animation-delay: 0.15s; }
+.item:nth-child(3) { animation-delay: 0.3s;  }
+.item:nth-child(4) { animation-delay: 0.45s; }
+```
+
+### Animasi dengan JavaScript
+
+JavaScript boleh digunakan untuk animasi yang lebih kompleks — misalnya counter angka, efek partikel, atau perpindahan konten:
+
+```html
+<script>
+  // Contoh: counter angka animasi
+  function animateCount(el, target, duration) {
+    const start = performance.now();
+    function step(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      el.textContent = Math.floor(progress * target).toLocaleString('id-ID');
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  const el = document.getElementById('angka');
+  animateCount(el, 1500000, 2000); // hitung dari 0 ke 1.500.000 dalam 2 detik
+</script>
+```
+
+> **Catatan:** Hindari animasi yang sangat berat (Three.js, canvas dengan banyak partikel) pada hardware display yang terbatas seperti Raspberry Pi.
 
 ---
 
 ## Struktur HTML yang Disarankan
-
-Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Gunakan struktur berikut sebagai dasar:
 
 ```html
 <!DOCTYPE html>
@@ -235,51 +334,67 @@ Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Guna
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    /* WAJIB: reset dan fullscreen */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    /* ── RESET & FULLSCREEN (wajib) ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       width: 100vw;
       height: 100vh;
-      overflow: hidden;           /* jangan ada scrollbar */
+      overflow: hidden;    /* tidak ada scrollbar */
       font-family: ui-sans-serif, system-ui, sans-serif;
+      background: {{bg:color:Warna Background:#0f172a}};
     }
 
-    /* Letakkan style konten di sini */
+    /* ── LAYOUT ── */
     body {
-      background: {{bg_color:color:Warna Background:#000000}};
       display: flex;
       align-items: center;
       justify-content: center;
     }
+
+    /* ── ANIMASI ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── KONTEN ── */
+    .wrap { text-align: center; }
+    h1 {
+      font-size: 4rem; color: #fff;
+      animation: fadeUp 0.8s ease both;
+    }
   </style>
 </head>
 <body>
-  <!-- Konten iklan di sini -->
+  <div class="wrap">
+    <h1>{{judul:text:Judul:Judul Iklan}}</h1>
+  </div>
+
+  <!-- JavaScript (opsional, inline) -->
+  <script>
+    // animasi atau logika tambahan di sini
+  </script>
 </body>
 </html>
 ```
 
-**Yang wajib ada:**
+**Yang wajib:**
 - `width: 100vw; height: 100vh` pada `body`
-- `overflow: hidden` — mencegah scrollbar muncul di layar display
-- Tidak ada elemen yang keluar dari batas layar
+- `overflow: hidden` — mencegah scrollbar
+- Semua CSS dan JS di dalam satu file yang sama
 
-**Yang sebaiknya dihindari:**
-- Scroll horizontal atau vertikal
-- Font dari Google Fonts atau CDN eksternal (membutuhkan internet)
-- JavaScript yang berat atau animasi CPU-intensive
-- `position: fixed` tanpa memperhitungkan batas layar
+**Yang harus dihindari:**
+- Elemen interaktif: `<button>`, `<input>`, `<select>`, `<a href>` yang terlihat sebagai tombol
+- Scroll vertikal atau horizontal
+- File CSS/JS eksternal (butuh internet atau path absolut yang mungkin tidak valid)
+- `alert()`, `prompt()`, `confirm()` di JavaScript
 
 ---
 
 ## Contoh Template Lengkap
 
-### 1. Template Promo Sederhana
+### 1. Promo dengan Animasi Fade & Pulse
 
 ```html
 <!DOCTYPE html>
@@ -291,27 +406,43 @@ Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Guna
     html, body {
       width: 100vw; height: 100vh; overflow: hidden;
       font-family: ui-sans-serif, system-ui, sans-serif;
-      background: {{bg_color:color:Warna Background:#1a1a2e}};
+      background: {{bg:color:Warna Background:#0d0d1a}};
       display: flex; align-items: center; justify-content: center;
     }
-    .wrap { text-align: center; padding: 60px; }
+
+    :root { --aksen: {{aksen:color:Warna Aksen:#e63946}}; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(32px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--aksen) 40%, transparent); }
+      50%       { transform: scale(1.03); box-shadow: 0 0 0 16px transparent; }
+    }
+
+    .wrap { text-align: center; padding: 60px; max-width: 900px; }
     .label {
-      font-size: 1rem; font-weight: 600; letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: {{aksen:color:Warna Aksen:#e63946}};
+      font-size: 0.9rem; font-weight: 700; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--aksen);
       margin-bottom: 20px;
+      animation: fadeUp 0.6s ease both;
     }
     h1 {
-      font-size: 4rem; font-weight: 800; color: #fff;
-      line-height: 1.1; letter-spacing: -0.02em;
-      margin-bottom: 16px;
+      font-size: 5rem; font-weight: 900; color: #fff;
+      line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 20px;
+      animation: fadeUp 0.6s 0.1s ease both;
     }
-    p { font-size: 1.5rem; color: rgba(255,255,255,0.6); margin-bottom: 40px; }
-    .cta {
-      display: inline-block; padding: 16px 48px;
-      background: {{aksen:color:Warna Aksen:#e63946}};
-      color: #fff; font-size: 1.125rem; font-weight: 700;
-      border-radius: 100px;
+    p {
+      font-size: 1.4rem; color: rgba(255,255,255,0.55);
+      margin-bottom: 48px; line-height: 1.6;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+    .badge {
+      display: inline-block; padding: 16px 52px;
+      background: var(--aksen); color: #fff;
+      font-size: 1.25rem; font-weight: 800; border-radius: 100px;
+      animation: fadeUp 0.6s 0.3s ease both, pulse 2.5s 1s ease-in-out infinite;
     }
   </style>
 </head>
@@ -319,27 +450,16 @@ Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Guna
   <div class="wrap">
     <p class="label">{{label:text:Label Atas:Penawaran Terbatas}}</p>
     <h1>{{judul:text:Judul Utama:Diskon 50%}}</h1>
-    <p>{{deskripsi:textarea:Deskripsi:Dapatkan penawaran terbaik hari ini.}}</p>
-    <div class="cta">{{cta_text:text:Teks Tombol:Beli Sekarang}}</div>
+    <p>{{deskripsi:textarea:Deskripsi:Dapatkan penawaran terbaik untuk semua produk pilihan.}}</p>
+    <div class="badge">{{cta:text:Teks Badge:Berlaku Hari Ini}}</div>
   </div>
 </body>
 </html>
 ```
 
-**Field yang dihasilkan:**
-
-| Field | Tipe | Label | Default |
-|---|---|---|---|
-| `bg_color` | color | Warna Background | `#1a1a2e` |
-| `aksen` | color | Warna Aksen | `#e63946` |
-| `label` | text | Label Atas | `Penawaran Terbatas` |
-| `judul` | text | Judul Utama | `Diskon 50%` |
-| `deskripsi` | textarea | Deskripsi | `Dapatkan penawaran...` |
-| `cta_text` | text | Teks Tombol | `Beli Sekarang` |
-
 ---
 
-### 2. Template Produk dengan Foto
+### 2. Produk dengan Foto & Float Animation
 
 ```html
 <!DOCTYPE html>
@@ -351,41 +471,64 @@ Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Guna
     html, body {
       width: 100vw; height: 100vh; overflow: hidden;
       font-family: ui-sans-serif, system-ui, sans-serif;
-      background: {{bg_color:color:Warna Background:#0f172a}};
+      background: {{bg:color:Warna Background:#0f172a}};
       display: flex; align-items: center; justify-content: center;
     }
+
+    :root { --aksen: {{aksen:color:Warna Aksen:#6366f1}}; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-14px); }
+    }
+
     .layout {
       display: flex; align-items: center;
       gap: 80px; padding: 60px; max-width: 1200px; width: 100%;
     }
-    .foto {
-      flex-shrink: 0; width: 420px; height: 320px;
-      border-radius: 16px; overflow: hidden; background: #1e293b;
+    .foto-wrap {
+      flex-shrink: 0; width: 400px; height: 400px; border-radius: 50%;
+      overflow: hidden; background: #1e293b;
+      animation: float 4s ease-in-out infinite;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5);
     }
-    .foto img { width: 100%; height: 100%; object-fit: cover; }
+    .foto-wrap img { width: 100%; height: 100%; object-fit: cover; }
     .konten { flex: 1; }
     .tag {
-      display: inline-block; padding: 4px 14px; border-radius: 100px;
-      background: {{aksen:color:Warna Aksen:#6366f1}};
-      color: #fff; font-size: 0.85rem; font-weight: 600; margin-bottom: 20px;
+      display: inline-block; padding: 5px 16px; border-radius: 100px;
+      background: var(--aksen); color: #fff;
+      font-size: 0.8rem; font-weight: 700; margin-bottom: 20px;
+      animation: fadeUp 0.6s ease both;
     }
     h1 {
-      font-size: 3rem; font-weight: 800; color: #fff;
-      letter-spacing: -0.02em; margin-bottom: 12px;
+      font-size: 3.5rem; font-weight: 800; color: #fff;
+      letter-spacing: -0.02em; margin-bottom: 14px;
+      animation: fadeUp 0.6s 0.1s ease both;
     }
-    p { font-size: 1.125rem; color: rgba(255,255,255,0.55); margin-bottom: 28px; }
-    .harga { font-size: 2.5rem; font-weight: 800; color: {{aksen}}; }
+    p {
+      font-size: 1.125rem; color: rgba(255,255,255,0.5);
+      margin-bottom: 30px; line-height: 1.7; white-space: pre-line;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+    .harga {
+      font-size: 2.75rem; font-weight: 900; color: var(--aksen);
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
   </style>
 </head>
 <body>
   <div class="layout">
-    <div class="foto">
-      <img src="{{foto:image:Foto Produk}}" alt="{{nama:text:Nama Produk}}">
+    <div class="foto-wrap">
+      <img src="{{foto:image:Foto Produk}}" alt="produk">
     </div>
     <div class="konten">
       <span class="tag">{{tag:text:Tag:Produk Unggulan}}</span>
       <h1>{{nama:text:Nama Produk:Nama Produk Anda}}</h1>
-      <p>{{deskripsi:textarea:Deskripsi:Deskripsi singkat produk.}}</p>
+      <p>{{deskripsi:textarea:Deskripsi:Deskripsi singkat produk Anda.}}</p>
       <div class="harga">{{harga:text:Harga:Rp 0}}</div>
     </div>
   </div>
@@ -395,7 +538,7 @@ Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Guna
 
 ---
 
-### 3. Template Pengumuman / Running Text
+### 3. Pengumuman dengan Marquee
 
 ```html
 <!DOCTYPE html>
@@ -406,41 +549,68 @@ Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Guna
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100vw; height: 100vh; overflow: hidden;
-      background: {{bg_color:color:Warna Background:#0a0a0a}};
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: {{bg:color:Warna Background:#0a0a0a}};
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      font-family: ui-sans-serif, system-ui, sans-serif;
     }
-    .judul-wrap {
-      border-left: 6px solid {{aksen:color:Warna Aksen:#f59e0b}};
-      padding: 0 0 0 28px; margin-bottom: 32px;
+
+    :root { --aksen: {{aksen:color:Warna Aksen:#f59e0b}}; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
+    @keyframes marquee {
+      from { transform: translateX(100vw); }
+      to   { transform: translateX(-100%); }
+    }
+
+    .konten { text-align: center; padding: 0 80px; max-width: 1100px; }
     .kategori {
-      font-size: 0.875rem; font-weight: 600; letter-spacing: 0.1em;
-      text-transform: uppercase; color: {{aksen}};
-      margin-bottom: 10px;
+      font-size: 0.875rem; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--aksen); margin-bottom: 16px;
+      animation: fadeUp 0.6s ease both;
     }
     h1 {
-      font-size: 3.5rem; font-weight: 800; color: #fff;
-      line-height: 1.1; max-width: 900px;
+      font-size: 4rem; font-weight: 900; color: #fff;
+      line-height: 1.1; margin-bottom: 24px;
+      animation: fadeUp 0.6s 0.1s ease both;
     }
     .isi {
-      font-size: 1.25rem; color: rgba(255,255,255,0.65);
-      max-width: 700px; text-align: center; line-height: 1.7;
+      font-size: 1.3rem; color: rgba(255,255,255,0.6); line-height: 1.7;
       white-space: pre-line;
+      animation: fadeUp 0.6s 0.2s ease both;
     }
     .tanggal {
-      margin-top: 40px; font-size: 0.875rem; color: rgba(255,255,255,0.3);
+      margin-top: 36px; font-size: 0.875rem; color: rgba(255,255,255,0.25);
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    /* Ticker berjalan di bagian bawah */
+    .ticker {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--aksen); padding: 10px 0; overflow: hidden;
+    }
+    .ticker-inner {
+      white-space: nowrap;
+      font-size: 1rem; font-weight: 700; color: #000;
+      animation: marquee {{ticker_speed:text:Kecepatan Ticker:14s}} linear infinite;
     }
   </style>
 </head>
 <body>
-  <div class="judul-wrap">
+  <div class="konten">
     <p class="kategori">{{kategori:text:Kategori:Pengumuman}}</p>
-    <h1>{{judul:text:Judul Pengumuman:Judul Pengumuman}}</h1>
+    <h1>{{judul:text:Judul:Judul Pengumuman}}</h1>
+    <p class="isi">{{isi:textarea:Isi:Isi pengumuman di sini.}}</p>
+    <p class="tanggal">{{tanggal:text:Tanggal:}}</p>
   </div>
-  <p class="isi">{{isi:textarea:Isi Pengumuman:Isi pengumuman di sini.}}</p>
-  <p class="tanggal">{{tanggal:text:Tanggal:}}</p>
+  <div class="ticker">
+    <div class="ticker-inner">
+      {{ticker:text:Teks Ticker:Selamat datang &nbsp;•&nbsp; Informasi penting &nbsp;•&nbsp; Terima kasih telah berkunjung}}
+    </div>
+  </div>
 </body>
 </html>
 ```
@@ -451,66 +621,73 @@ Template harus dirancang untuk ditampilkan **fullscreen** di layar display. Guna
 
 ### Urutan field = urutan form
 
-Field muncul di form dashboard sesuai urutan kemunculannya di file template. Letakkan field yang paling sering diubah di bagian atas template (misalnya di `<style>` atau awal `<body>`).
+Field muncul di form dashboard sesuai urutan kemunculannya di template. Letakkan field yang paling sering diubah (judul, gambar) di bagian atas — misalnya di awal `<style>` atau `<body>`.
 
 ### Beri default yang bermakna
 
-Default value membantu admin memahami format yang diharapkan dan mempercepat pengisian form.
+Default membantu admin memahami format yang diharapkan:
 
 ```html
-<!-- Baik: default jelas -->
+<!-- Baik -->
 {{harga:text:Harga:Rp 150.000}}
 {{tanggal:text:Tanggal:31 Desember 2025}}
 
-<!-- Kurang baik: default kosong, admin bingung format yang diharapkan -->
+<!-- Kurang baik — admin tidak tahu format yang diharapkan -->
 {{harga:text:Harga}}
 ```
 
-### Gunakan field `color` untuk tema
-
-Alih-alih hardcode warna di seluruh CSS, definisikan warna sebagai field di awal `<style>` dan pakai ulang melalui mekanisme field berulang.
+### Gunakan CSS variable untuk warna
 
 ```html
 <style>
-  /* Definisi warna sebagai field */
   :root {
     --aksen: {{aksen:color:Warna Aksen:#3b82f6}};
-    --bg: {{bg:color:Background:#0f172a}};
+    --bg:    {{bg:color:Background:#0f172a}};
   }
-  /* Pakai variabel CSS — lebih bersih dari field berulang */
-  .tombol { background: var(--aksen); }
-  .border  { border-color: var(--aksen); }
-  body     { background: var(--bg); }
+  body { background: var(--bg); }
+  .sorot { color: var(--aksen); }
+  .badge { background: var(--aksen); }
 </style>
 ```
 
-> Ini adalah cara terbaik untuk field warna yang dipakai banyak elemen: definisikan sekali sebagai CSS variable, pakai via `var(--nama)` di seluruh CSS.
+Lebih bersih daripada menduplikasi `{{aksen}}` di setiap elemen.
 
 ### Hindari dependensi eksternal
 
-Template dirender secara lokal tanpa koneksi internet. Hindari:
+Template dirender secara lokal — tidak ada koneksi internet yang dijamin. Hindari CDN dan Google Fonts:
 
-```html
-<!-- Jangan: butuh internet -->
-<link href="https://fonts.googleapis.com/css2?family=Inter" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/..."></script>
+```css
+/* Jangan */
+@import url('https://fonts.googleapis.com/css2?family=Inter');
 
-<!-- Aman: font sistem -->
+/* Gunakan font sistem */
 font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
 font-family: ui-serif, Georgia, serif;
-font-family: ui-monospace, monospace;
 ```
 
-### Pastikan teks terbaca dari jarak jauh
+### Ukuran teks untuk layar display
 
-Layar display biasanya dilihat dari jarak 1–3 meter. Gunakan ukuran font yang besar:
+Layar dilihat dari jarak 1–3 meter, teks harus besar:
 
-| Elemen | Ukuran minimum yang disarankan |
+| Elemen | Minimum |
 |---|---|
-| Judul utama | `2.5rem` (40px) |
-| Subjudul | `1.5rem` (24px) |
-| Body text | `1.125rem` (18px) |
-| Label kecil | `0.875rem` (14px) |
+| Judul utama | `2.5rem` |
+| Subjudul | `1.5rem` |
+| Body text | `1.125rem` |
+| Label kecil | `0.875rem` |
+
+### Animasi yang bersahabat dengan hardware ringan
+
+Gunakan properti yang di-*composite* oleh browser (tidak memicu reflow):
+
+```css
+/* Baik — GPU-accelerated */
+transform: translateY(), scale(), rotate()
+opacity
+
+/* Hindari jika bisa — memicu reflow/repaint */
+width, height, top, left, margin, padding
+```
 
 ---
 
@@ -518,22 +695,31 @@ Layar display biasanya dilihat dari jarak 1–3 meter. Gunakan ukuran font yang 
 
 ### Field tidak muncul di form dashboard
 
-Kemungkinan penyebab:
-- Nama field mengandung karakter yang tidak valid (spasi, tanda hubung, dll.)
-- Sintaks field tidak lengkap atau salah (misal tanda `{{` tidak ditutup dengan `}}`)
-- Tipe yang ditulis tidak dikenali — sistem akan fallback ke `text`, periksa ejaan
+- Nama field mengandung karakter tidak valid (spasi, tanda hubung, dll.)
+- Sintaks `{{` tidak ditutup dengan `}}`
+- Tipe tidak dikenali — fallback ke `text`, periksa ejaan
 
 ### Nilai tidak terganti di hasil generate
 
-- Pastikan nama field di template sama persis dengan yang tersimpan (case-sensitive)
-- Jika field gambar kosong, atribut `src` pada `<img>` akan kosong — gambar tidak tampil, ini normal
+- Nama field case-sensitive — `Judul` ≠ `judul`
+- Field gambar kosong → `src=""` → gambar tidak tampil, ini normal
 
 ### Tampilan berantakan di layar
 
-- Pastikan ada `overflow: hidden` di `body`
-- Cek apakah ada elemen yang lebar/tingginya melebihi 100vw/100vh
-- Uji di resolusi yang sama dengan layar display target (misal 1920×1080)
+- Pastikan `overflow: hidden` ada di `body`
+- Uji di resolusi yang sama dengan layar target (misal 1920×1080)
+- Cek elemen yang mungkin meluber keluar `100vw` atau `100vh`
+
+### Animasi terasa patah-patah
+
+- Kurangi jumlah elemen yang dianimasikan sekaligus
+- Gunakan hanya `transform` dan `opacity` (GPU-accelerated)
+- Tambahkan `will-change: transform` pada elemen yang dianimasikan:
+
+```css
+.gambar { will-change: transform; animation: float 3s ease-in-out infinite; }
+```
 
 ### File generated tidak diperbarui setelah edit
 
-Klik tombol **Edit** pada item di dashboard, ubah nilai field, lalu **Simpan** — sistem akan otomatis regenerate file. Atau gunakan endpoint `POST /api/items/{id}/regenerate` secara manual.
+Klik **Edit** pada item di dashboard, ubah nilai field, lalu **Simpan** — sistem otomatis regenerate file. Atau gunakan endpoint `POST /api/items/{id}/regenerate` secara manual.

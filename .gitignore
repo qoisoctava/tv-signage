@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Runtime data
+database.db
+static/uploads/*
+!static/uploads/.gitkeep
+signage_templates/
+generated_items/*
+!generated_items/.gitkeep
+
+# OS / editor
+.DS_Store
